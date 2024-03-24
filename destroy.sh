@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
 
-docker stop lab-app
-docker rm lab-app
-docker rmi lab-app
+docker stop lab-app-python
+docker rm lab-app-python
+docker rmi lab-app-python
