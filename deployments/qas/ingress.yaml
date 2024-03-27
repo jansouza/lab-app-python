@@ -5,7 +5,7 @@ metadata:
   name: lab-app-python-ingress
   namespace: default
   labels:
-    app: llab-app-python
+    app: lab-app-python
 spec:
   tls:
     - hosts:

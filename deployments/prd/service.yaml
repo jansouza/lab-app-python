@@ -1,0 +1,16 @@
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: lab-app-python-service
+  namespace: default
+  labels:
+    app: lab-app-python
+spec:
+  ports:
+    - port: 8089
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: lab-app-python
+  type: LoadBalancer

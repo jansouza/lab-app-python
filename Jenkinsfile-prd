@@ -1,0 +1,75 @@
+pipeline {
+  agent {
+    kubernetes {
+      yaml '''
+        apiVersion: v1
+        kind: Pod
+        spec:
+          containers:
+          - name: devops-tools
+            image: jansouza/devops-tools:latest
+            alwaysPullImage: true
+            command: ["sleep", "infinity"]
+      '''
+      defaultContainer 'devops-tools'
+    }
+  }
+
+  environment {
+    DEPLOY_APP_NAME = "lab-app-python"
+    DEPLOY_QAS_REGISTRY = "registry.docker-registry.svc:5001/qas"
+    DEPLOY_PRD_REGISTRY = "registry.docker-registry.svc:5001/prd"
+  }
+
+  stages {
+
+    stage("Release scope") {
+      steps {
+        script {
+          // Prepare a list and write to file
+          TAGS = sh(script:"skopeo --tls-verify=false list-tags docker://${DEPLOY_QAS_REGISTRY}/${DEPLOY_APP_NAME}|jq -r '.Tags[]'", returnStdout: true).trim()
+
+        // Show the select input
+          env.RELEASE_TAG = input message: 'User input required', ok: 'Release!',
+                              parameters: [choice(name: 'RELEASE_SCOPE', choices: TAGS, description: 'What is the release scope?')]
+        }
+        echo "Release scope selected: ${env.RELEASE_TAG}"
+      }
+    }
+
+    stage('Check Image') {
+      steps {
+        container(name: 'devops-tools') {
+          sh """
+          skopeo --tls-verify=false inspect 'docker://${DEPLOY_QAS_REGISTRY}/${DEPLOY_APP_NAME}:${env.RELEASE_TAG}' > image.json
+          if [ \$? -ne 0 ]; then
+            echo 'Image ${DEPLOY_QAS_REGISTRY}/${DEPLOY_APP_NAME}:${env.RELEASE_TAG} does not exist in registry.'
+            exit 1
+          fi
+          """
+          //Get Labels
+          script {
+            APP_NAME = sh(script:"cat image.json|jq -r '.Labels.app_name'", returnStdout: true).trim()
+            APP_VERSION = sh(script:"cat image.json|jq -r '.Labels.app_version'", returnStdout: true).trim()
+            APP_BUILD = sh(script:"cat image.json|jq -r '.Labels.app_build'", returnStdout: true).trim()
+            echo "${APP_NAME}"
+            echo "${APP_VERSION}"
+            echo "${APP_BUILD}"
+          }
+        }
+      }
+    } //Check Image
+
+    stage('Promote Image') {
+      steps {
+        container(name: 'devops-tools') {
+          sh """
+          skopeo --tls-verify=false copy docker://${DEPLOY_QAS_REGISTRY}/${APP_NAME}:${env.RELEASE_TAG} docker://${DEPLOY_PRD_REGISTRY}/${DEPLOY_APP_NAME}:v${APP_VERSION}-${currentBuild.number}
+          """
+        }
+      }
+    } //Promote Image Registry
+
+  } //stages
+
+} // pipeline
