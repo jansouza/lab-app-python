@@ -1,4 +1,4 @@
-FROM python:3.8 as base
+FROM python:3.13.11 as base
 ARG TARGETPLATFORM
 ARG BUILDPLATFORM
 
